@@ -2,3 +2,13 @@
 data/
 .env
 __pycache__/
+
+# d? li?u l?n do A sinh
+data/*
+!data/.gitkeep
+!data/README.md
+
+# python
+.venv/
+__pycache__/
+*.pyc
