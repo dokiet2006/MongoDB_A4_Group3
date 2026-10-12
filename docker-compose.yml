@@ -1,0 +1,24 @@
+﻿name: mongodb-a4
+
+services:
+  mongo:
+    image: mongo:8.0
+    container_name: mongo-single
+    command: mongod --bind_ip_all --wiredTigerCacheSizeGB ${MONGO_CACHE_GB:-2}
+    ports: ["127.0.0.1:27017:27017"]
+    volumes:
+      - mongo_data:/data/db
+      - ./data:/data/import:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "${MONGO_CPUS:-4}"
+          memory: ${MONGO_MEM:-4g}
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mongo_data:
