@@ -1,0 +1,326 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: sales_management
+name: Sales Management Data Contract
+version: 1.0.0
+status: draft
+
+description:
+  purpose: "Quy định cấu trúc và quy tắc dữ liệu dùng chung cho dự án quản lý bán hàng sử dụng MySQL và MongoDB"
+  usage: "Sử dụng để sinh bộ dữ liệu thống nhất và so sánh hiệu năng truy vấn giữa MySQL và MongoDB"
+  limitations: "Quy mô dữ liệu và các quy tắc nghiệp vụ đang chờ nhóm thống nhất"
+
+schema:
+  - name: SalesManagement
+    physical_type: Dataset
+    description: "Bảng tổng hợp dữ liệu quản lý bán hàng"
+    properties:
+    - name: Customer
+      description: "Thông tin khách hàng"
+      fields:
+        - name: customer_id
+          type: string
+          description: "Mã định danh khách hàng"
+          primary_key: true
+          example: "CUST001"
+          constraints:
+            - unique
+            - not_null
+          required: true
+        - name: name
+          type: string
+          description: "Tên khách hàng"
+          example: "Nguyen Van A"
+          constraints:
+            - not_null
+          required: true
+        - name: email
+          type: string
+          description: "Địa chỉ email của khách hàng"
+          example: "nguyenvana@example.com"
+          constraints:
+            - unique
+          required: false
+        - name: phone_number
+          type: string
+          description: "Số điện thoại liên hệ"
+          example: "0901234567"
+          required: false
+        - name: address
+          type: string
+          description: "Địa chỉ khách hàng"
+          example: "123 Đường ABC, Quận XYZ, TP. HCM"
+          required: false
+
+    - name: Product
+      description: "Thông tin sản phẩm"
+      fields:
+        - name: product_id
+          type: string
+          description: "Mã định danh sản phẩm"
+          primary_key: true
+          example: "PROD001"
+          constraints:
+            - unique
+            - not_null
+          required: true
+        - name: name
+          type: string
+          description: "Tên sản phẩm"
+          example: "Laptop Dell XPS 13"
+          constraints:
+            - not_null
+          required: true
+        - name: price
+          type: decimal
+          description: "Giá bán sản phẩm"
+          example: 2500.00
+          constraints:
+            - not_null
+          required: true
+        - name: category_id
+          type: string
+          description: "Mã định danh danh mục sản phẩm (liên kết với Category)"
+          example: "CAT001"
+          constraints:
+            - not_null
+          required: true
+          relationships:
+            - target: Category
+              type: many_to_one
+              description: "Mỗi sản phẩm thuộc về một danh mục"
+            - type: foreign_key
+              target_field: category_id
+              source_field: category_id
+              description: "Liên kết với Category thông qua category_id"
+
+    - name: Order
+      description: "Thông tin đơn hàng"
+      fields:
+        - name: order_id
+          type: string
+          description: "Mã định danh đơn hàng"
+          primary_key: true
+          example: "ORD001"
+          constraints:
+            - unique
+            - not_null
+          required: true
+        - name: customer_id
+          type: string
+          description: "Mã định danh khách hàng (liên kết với Customer)"
+          example: "CUST001"
+          constraints:
+            - not_null
+          required: true
+          relationships:
+            - target: Customer
+              type: many_to_one
+              description: "Mỗi đơn hàng thuộc về một khách hàng"
+            - type: foreign_key
+              target_field: customer_id
+              source_field: customer_id
+              description: "Liên kết với Customer thông qua customer_id"
+        - name: order_date
+          type: datetime
+          description: "Ngày đặt hàng"
+          example: "2023-10-01T10:00:00Z"
+          constraints:
+            - not_null
+          required: true
+        - name: status
+          type: string
+          description: "Trạng thái đơn hàng (ví dụ: pending, completed, canceled)"
+          example: "pending"
+          constraints:
+            - not_null
+          required: true
+          quality_rules:
+            - rule: "status must be one of the allowed values"
+              allowed_values: ["pending", "completed", "canceled"]
+              description: "Trạng thái đơn hàng phải là một trong các giá trị cho phép"
+        - name: total_amount
+          type: decimal
+          description: "Tổng số tiền của đơn hàng"
+          example: 2500.00
+          constraints:
+            - not_null
+          required: true
+
+        - name: store_id
+          type: string
+          description: "Mã định danh cửa hàng (liên kết với Store)"
+          example: "STORE001"
+          constraints:
+            - not_null
+          required: true
+          relationships:
+            - target: Store
+              type: many_to_one
+              description: "Mỗi đơn hàng được thực hiện tại một cửa hàng"
+            - type: foreign_key
+              target_field: store_id
+              source_field: store_id
+              description: "Liên kết với Store thông qua store_id"
+    
+    - name: OrderItem
+      description: "Chi tiết các sản phẩm trong đơn hàng"
+      fields:
+        - name: order_item_id
+          type: string
+          description: "Mã định danh chi tiết đơn hàng"
+          primary_key: true
+          example: "ORDITEM001"
+          constraints:
+            - unique
+            - not_null
+          required: true
+        - name: order_id
+          type: string
+          description: "Mã định danh đơn hàng (liên kết với Order)"
+          example: "ORD001"
+          constraints:
+            - not_null
+          required: true
+          relationships:
+            - target: Order
+              type: many_to_one
+              description: "Mỗi chi tiết đơn hàng thuộc về một đơn hàng"
+            - type: foreign_key
+              target_field: order_id
+              source_field: order_id
+              description: "Liên kết với Order thông qua order_id"
+        - name: product_id
+          type: string
+          description: "Mã định danh sản phẩm (liên kết với Product)"
+          example: "PROD001"
+          constraints:
+            - not_null
+          required: true
+          relationships:
+            - target: Product
+              type: many_to_one
+              description: "Mỗi chi tiết đơn hàng liên kết với một sản phẩm"
+            - type: foreign_key
+              target_field: product_id
+              source_field: product_id
+              description: "Liên kết với Product thông qua product_id"
+        - name: quantity
+          type: integer
+          description: "Số lượng sản phẩm trong đơn hàng"
+          example: 2
+          constraints:
+            - not_null
+          required: true
+        - name: unit_price
+          type: decimal
+          description: "Giá bán của sản phẩm tại thời điểm đặt hàng"
+          example: 2500.00
+          constraints:
+            - not_null
+          required: true
+
+    - name: Payment
+      description: "Thông tin thanh toán cho đơn hàng"
+      fields:
+        - name: payment_id
+          type: string
+          description: "Mã định danh thanh toán"
+          primary_key: true
+          example: "PAY001"
+          constraints:
+            - unique
+            - not_null
+          required: true
+        - name: order_id
+          type: string
+          description: "Mã định danh đơn hàng (liên kết với Order)"
+          example: "ORD001"
+          constraints:
+            - not_null
+          required: true
+          relationships:
+            - target: Order
+              type: many_to_one
+              description: "Mỗi thanh toán liên kết với một đơn hàng"
+            - type: foreign_key
+              target_field: order_id
+              source_field: order_id
+              description: "Liên kết với Order thông qua order_id"
+        - name: payment_date
+          type: datetime
+          description: "Ngày thực hiện thanh toán"
+          example: "2023-10-02T15:30:00Z"
+          constraints:
+            - not_null
+          required: true
+        - name: amount
+          type: decimal
+          description: "Số tiền thanh toán"
+          example: 2500.00
+          constraints:
+            - not_null
+          required: true
+        - name: payment_method
+          type: string
+          description: "Phương thức thanh toán (ví dụ: thẻ tín dụng, chuyển khoản, tiền mặt)"
+          example: "Thẻ tín dụng"
+          required: true
+
+    
+    - name: Store
+      description: "Thông tin cửa hàng bán hàng"
+      fields:
+        - name: store_id
+          type: string
+          description: "Mã định danh cửa hàng"
+          primary_key: true
+          example: "STORE001"
+          constraints:
+            - unique
+            - not_null
+          required: true
+        - name: name
+          type: string
+          description: "Tên cửa hàng"
+          example: "Cửa hàng điện máy"
+          constraints:
+            - not_null
+          required: true
+        - name: location
+          type: string
+          description: "Địa chỉ cửa hàng"
+          example: "123 Đường ABC, Quận XYZ"
+          required: false
+
+    - name: Category
+      description: "Thông tin danh mục sản phẩm"
+      fields:
+        - name: category_id
+          type: string
+          description: "Mã định danh danh mục"
+          primary_key: true
+          example: "CAT001"
+          constraints:
+            - unique
+            - not_null
+          required: true
+        - name: name
+          type: string
+          description: "Tên danh mục"
+          example: "Điện máy"
+          constraints:
+            - not_null
+          required: true
+        - name: description
+          type: string
+          description: "Mô tả về danh mục sản phẩm"
+          example: "Danh mục các sản phẩm điện máy"
+          required: false
+    Quality rules:
+      - rule: "customer_id in Order must exist in Customer"
+        description: "Mỗi order phải liên kết với một khách hàng hợp lệ"
+      - rule: "product_id in OrderItem must exist in Product"
+        description: "Mỗi chi tiết đơn hàng phải liên kết với một sản phẩm hợp lệ"
+      - rule: "order_id in Payment must exist in Order"
+        description: "Mỗi thanh toán phải liên kết với một đơn hàng hợp lệ"

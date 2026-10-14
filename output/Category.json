@@ -1,0 +1,102 @@
+[
+  {
+    "category_id": "CAT000001",
+    "name": "Man hinh",
+    "description": "Mô tả cho Category 1"
+  },
+  {
+    "category_id": "CAT000002",
+    "name": "Laptop",
+    "description": "Mô tả cho Category 2"
+  },
+  {
+    "category_id": "CAT000003",
+    "name": "May in",
+    "description": "Mô tả cho Category 3"
+  },
+  {
+    "category_id": "CAT000004",
+    "name": "Loa",
+    "description": "Mô tả cho Category 4"
+  },
+  {
+    "category_id": "CAT000005",
+    "name": "Loa",
+    "description": "Mô tả cho Category 5"
+  },
+  {
+    "category_id": "CAT000006",
+    "name": "Ban phim",
+    "description": "Mô tả cho Category 6"
+  },
+  {
+    "category_id": "CAT000007",
+    "name": "Man hinh",
+    "description": "Mô tả cho Category 7"
+  },
+  {
+    "category_id": "CAT000008",
+    "name": "Thiet bi gia dung",
+    "description": "Mô tả cho Category 8"
+  },
+  {
+    "category_id": "CAT000009",
+    "name": "May tinh bang",
+    "description": "Mô tả cho Category 9"
+  },
+  {
+    "category_id": "CAT000010",
+    "name": "Van phong pham",
+    "description": "Mô tả cho Category 10"
+  },
+  {
+    "category_id": "CAT000011",
+    "name": "Linh kien",
+    "description": "Mô tả cho Category 11"
+  },
+  {
+    "category_id": "CAT000012",
+    "name": "Dien thoai",
+    "description": "Mô tả cho Category 12"
+  },
+  {
+    "category_id": "CAT000013",
+    "name": "Laptop",
+    "description": "Mô tả cho Category 13"
+  },
+  {
+    "category_id": "CAT000014",
+    "name": "May tinh bang",
+    "description": "Mô tả cho Category 14"
+  },
+  {
+    "category_id": "CAT000015",
+    "name": "Tai nghe",
+    "description": "Mô tả cho Category 15"
+  },
+  {
+    "category_id": "CAT000016",
+    "name": "Loa",
+    "description": "Mô tả cho Category 16"
+  },
+  {
+    "category_id": "CAT000017",
+    "name": "Dong ho",
+    "description": "Mô tả cho Category 17"
+  },
+  {
+    "category_id": "CAT000018",
+    "name": "San pham khac",
+    "description": "Mô tả cho Category 18"
+  },
+  {
+    "category_id": "CAT000019",
+    "name": "Laptop",
+    "description": "Mô tả cho Category 19"
+  },
+  {
+    "category_id": "CAT000020",
+    "name": "Thiet bi gia dung",
+    "description": "Mô tả cho Category 20"
+  }
+]
