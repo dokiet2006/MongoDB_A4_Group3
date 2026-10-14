@@ -1,0 +1,2 @@
+NAME           IMAGE       COMMAND                  SERVICE   CREATED         STATUS                   PORTS
+mongo-single   mongo:8.0   "docker-entrypoint.sΓÇª"   mongo     4 minutes ago   Up 4 minutes (healthy)   127.0.0.1:27017->27017/tcp

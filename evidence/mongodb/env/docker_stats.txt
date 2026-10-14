@@ -1,0 +1,5 @@
+CONTAINER ID   NAME                    CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+70cca2d95717   mongo-single            0.73%     199.9MiB / 4GiB       4.88%     1.75kB / 126B     0B / 1.54MB       48
+d1be97e45019   kind-cloud-provider     3.69%     31.81MiB / 7.759GiB   0.40%     1.15MB / 72.6kB   79.6MB / 0B       10
+5f290654ff53   kind-registry-mirror    0.00%     10.08MiB / 7.759GiB   0.13%     25.1kB / 15.1kB   24.7MB / 0B       6
+92b8fbe3551a   desktop-control-plane   28.88%    783.4MiB / 7.759GiB   9.86%     262kB / 3.21MB    1.15GB / 90.2MB   248

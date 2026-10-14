@@ -1,0 +1,18 @@
+﻿Checked: 2026-10-07 08:49:09
+=== Hardware ===
+RAM_GB=15.7
+12th Gen Intel(R) Core(TM) i5-12450HX cores=8 threads=12
+SAMSUNG MZAMX512HCLV-00BL2 SSD
+C_free_GB=68.8
+=== Docker ===
+Docker version 29.8.1, build 4a63305
+Docker Compose version v5.5.1
+CPUs=4 MemTotal=8331210752
+=== MongoDB (image mongo:8.0) ===
+db version v8.0.32
+mongosh 2.12.0
+mongoimport version: 100.19.1
+[mongo@sha256:d0d926f94df099bff534b7ee5b5986458131a22489dfff8664509af0c1e2ca9c]
+=== Python ===
+Python 3.13.15
+pymongo 4.18.2 pandas 3.0.6
