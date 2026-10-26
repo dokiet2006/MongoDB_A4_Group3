@@ -11,7 +11,7 @@ from xml.parsers.expat import errors
 
 random.seed(42)  # Giup sinh lai du lieu co the lap lai
 
-OUTPUT_DIR = Path("output")
+OUTPUT_DIR = Path(__file__).resolve().parent / "data"
 
 COUNTS = {
     "Category": 20,
@@ -33,10 +33,14 @@ def make_id(prefix, number):
 
 
 def random_date(start_date, end_date):
-    """Sinh ngay ngau nhien trong khoang cho truoc."""
     days = (end_date - start_date).days
     result = start_date + timedelta(days=random.randint(0, days))
-    return result.isoformat() + "T10:00:00Z"
+    return result.replace(
+        hour=10,
+        minute=0,
+        second=0,
+        microsecond=0
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def money(value):
@@ -225,7 +229,7 @@ def generate_orders(customers, stores, products):
                 "order_id": order_id,
                 "product_id": product["product_id"],
                 "quantity": quantity,
-                "uniprice": unit_price,
+                "unit_price": unit_price,
             })
 
             total += unit_price * quantity
@@ -357,8 +361,8 @@ def validate_data(tables):
             errors.append("OrderItem: product_id khong ton tai")
         if item["quantity"] <= 0:
             errors.append("OrderItem: quantity phai > 0")
-        if item["uniprice"] < 0:
-            errors.append("OrderItem: uniprice am")
+        if item["unit_price"] < 0:
+            errors.append("OrderItem: unit_price am")
 
     # Payment -> Order
     for payment in tables["Payment"]:
@@ -367,12 +371,12 @@ def validate_data(tables):
         if payment["amount"] < 0:
             errors.append("Payment: amount am")
 
-    # Tong Order = tong quantity * uniprice
+    # Tong Order = tong quantity * unit_price
     totals = {}
 
     for item in tables["OrderItem"]:
         order_id = item["order_id"]
-        line_total = item["uniprice"] * item["quantity"]
+        line_total = item["unit_price"] * item["quantity"]
 
         totals[order_id] = totals.get(
             order_id, Decimal("0.00")

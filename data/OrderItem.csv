@@ -1,4 +1,4 @@
-﻿order_item_id,order_id,product_id,quantity,uniprice
+﻿order_item_id,order_id,product_id,quantity,unit_price
 ITEM000001,ORD000001,PROD000678,4,381.10
 ITEM000002,ORD000001,PROD000184,2,1505.21
 ITEM000003,ORD000002,PROD000086,4,1119.07
