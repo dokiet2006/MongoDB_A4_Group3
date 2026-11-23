@@ -11,19 +11,45 @@ from xml.parsers.expat import errors
 
 random.seed(42)  # Giup sinh lai du lieu co the lap lai
 
-OUTPUT_DIR = Path("output")
 
-COUNTS = {
-    "Category": 20,
-    "Store": 20,
-    "Customer": 2000,
-    "Product": 1000,
-    "Order": 2500,
-    "OrderItem": 3000,
-    "Payment": 1460,
+
+BATCH_SIZE = 10_000
+
+DATA_SIZES = {
+    "100K": {
+        "Category": 20,
+        "Store": 20,
+        "Customer": 20_000,
+        "Product": 2_000,
+        "Order": 100_000,
+    },
+    "1M": {
+        "Category": 50,
+        "Store": 100,
+        "Customer": 200_000,
+        "Product": 20_000,
+        "Order": 1_000_000,
+    },
+    "5M": {
+        "Category": 100,
+        "Store": 500,
+        "Customer": 1_000_000,
+        "Product": 100_000,
+        "Order": 5_000_000,
+    }
 }
 
-assert sum(COUNTS.values()) == 10000
+SIZE = "5M"  # Có thể đổi thành "1M" hoặc "5M"
+OUTPUT_DIR = Path("output") / SIZE
+COUNTS = DATA_SIZES[SIZE]
+
+ORDER_COUNT = COUNTS["Order"]
+COMPLETED_COUNT = int(ORDER_COUNT * 0.7)
+PENDING_COUNT = int(ORDER_COUNT * 0.2)
+CANCELED_COUNT = ORDER_COUNT - COMPLETED_COUNT - PENDING_COUNT
+
+COUNTS["OrderItem"] = int(ORDER_COUNT * 1.2)
+COUNTS["Payment"] = int(COMPLETED_COUNT * 1460 / 1750)
 
 #2. CAC HAM HO TRO
 
@@ -44,37 +70,80 @@ def money(value):
     return Decimal(str(value)).quantize(Decimal("0.01"))
 
 
-def export_csv_json(table_name, rows):
-    """Xuat mot thuc the ra ca CSV va JSON."""
+def initialize_export(table_name, fieldnames):
+    """Khoi tao file CSV va JSON."""
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     csv_path = OUTPUT_DIR / f"{table_name}.csv"
     json_path = OUTPUT_DIR / f"{table_name}.json"
 
-    # Ghi CSV
-    if rows:
-        with csv_path.open(
-            "w", newline="", encoding="utf-8-sig"
-        ) as file:
-            writer = csv.DictWriter(
-                file, fieldnames=list(rows[0].keys())
-            )
-            writer.writeheader()
-            writer.writerows(rows)
+    # Khoi tao file CSV va ghi header
+    with csv_path.open("w", newline="", encoding="utf-8-sig") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
 
-    # Ghi JSON
+    # Khoi tao file JSON
     with json_path.open("w", encoding="utf-8") as file:
-        json.dump(
-            rows,
-            file,
-            ensure_ascii=False,
-            indent=2,
-            default=lambda value: float(value)
-            if isinstance(value, Decimal)
-            else str(value),
-        )
+        file.write("[")
 
-    print(f"Da xuat {table_name}: {len(rows)} ban ghi")
+    return {
+        "table_name": table_name,
+        "csv_path": csv_path,
+        "json_path": json_path,
+        "fieldnames": fieldnames,
+        "first_json": True,
+        "count": 0,
+    }
+
+
+def append_export(export_info, rows):
+    """Ghi them mot batch vao CSV va JSON."""
+
+    if not rows:
+        return
+
+    # Ghi them vao CSV
+    with export_info["csv_path"].open(
+        "a", newline="", encoding="utf-8-sig"
+    ) as file:
+        writer = csv.DictWriter(
+            file,
+            fieldnames=export_info["fieldnames"]
+        )
+        writer.writerows(rows)
+
+    # Ghi them vao JSON
+    with export_info["json_path"].open("a", encoding="utf-8") as file:
+        for row in rows:
+            if not export_info["first_json"]:
+                file.write(",")
+
+            json.dump(
+                row,
+                file,
+                ensure_ascii=False,
+                default=lambda value: float(value)
+                if isinstance(value, Decimal)
+                else str(value),
+            )
+
+            export_info["first_json"] = False
+
+    export_info["count"] += len(rows)
+
+
+def finalize_export(export_info):
+    """Hoan tat file JSON va thong bao ket qua."""
+
+    with export_info["json_path"].open("a", encoding="utf-8") as file:
+        file.write("]")
+
+    print(
+        f"Da xuat {export_info['table_name']}: "
+        f"{export_info['count']} ban ghi"
+    )
+
 
 #3. SINH CATOGORI va STORE
 
@@ -146,18 +215,28 @@ last_names = [
 ]
 
 def generate_customers():
-    customers = []
+    customers_batch = []
+
     for i in range(1, COUNTS["Customer"] + 1):
         first_name = random.choice(first_names)
         last_name = random.choice(last_names)
+
         customer = {
             "customer_id": make_id("CUST", i),
             "name": f"{first_name} {last_name}",
             "email": f"{last_name.lower().replace(' ', '')}_{first_name.lower().replace(' ', '')}{i:06d}@example.com",
             "phone_number": f"09{random.randint(10000000, 99999999)}",
         }
-        customers.append(customer)
-    return customers
+
+        customers_batch.append(customer)
+
+        if len(customers_batch) >= BATCH_SIZE:
+            yield customers_batch
+            customers_batch = []
+
+    if customers_batch:
+        yield customers_batch
+
 
 #5. SINH PRODUCT
 product_names = [
@@ -184,33 +263,42 @@ def generate_products(categories):
 start_date = datetime(2024, 1, 1)
 end_date = datetime(2026, 9, 30)
 
-def generate_orders(customers, stores, products):
-    orders = []
-    order_items = []
+def generate_orders(stores, products):
+    orders_batch = []
+    order_items_batch = []
+
+    # Tong so Order co 2 items
+    two_item_count = int(ORDER_COUNT * 0.2)
+
+    # Dem ID cua OrderItem
+    item_number = 0
 
     for i in range(1, COUNTS["Order"] + 1):
         order_id = make_id("ORD", i)
 
-        # Tao dung 1750 order completed
-        if i <= 1750:
+        # Phan bo trang thai Order
+        if i <= COMPLETED_COUNT:
             status = "completed"
-        elif i <= 2250:
+        elif i <= COMPLETED_COUNT + PENDING_COUNT:
             status = "pending"
         else:
             status = "canceled"
 
         order = {
             "order_id": order_id,
-            "customer_id": random.choice(customers)["customer_id"],
+            "customer_id": make_id(
+                "CUST",
+                random.randint(1, COUNTS["Customer"])
+            ),
             "store_id": random.choice(stores)["store_id"],
             "order_date": random_date(start_date, end_date),
             "status": status,
             "total_amount": Decimal("0.00"),
         }
 
-        # 500 order dau co 2 item;
-        # 2000 order con lai co 1 item.
-        number_of_items = 2 if i <= 500 else 1
+        # 20% Order co 2 items, 80% co 1 item
+        number_of_items = 2 if i <= two_item_count else 1
+
         total = Decimal("0.00")
 
         for _ in range(number_of_items):
@@ -218,10 +306,10 @@ def generate_orders(customers, stores, products):
             quantity = random.randint(1, 5)
             unit_price = product["price"]
 
-            order_items.append({
-                "order_item_id": make_id(
-                    "ITEM", len(order_items) + 1
-                ),
+            item_number += 1
+
+            order_items_batch.append({
+                "order_item_id": make_id("ITEM", item_number),
                 "order_id": order_id,
                 "product_id": product["product_id"],
                 "quantity": quantity,
@@ -231,146 +319,65 @@ def generate_orders(customers, stores, products):
             total += unit_price * quantity
 
         order["total_amount"] = money(total)
-        orders.append(order)
+        orders_batch.append(order)
 
-    return orders, order_items
+        # Khi du 10.000 Order thi tra ve mot batch
+        if len(orders_batch) >= BATCH_SIZE:
+            yield orders_batch, order_items_batch
+
+            # Tao batch moi
+            orders_batch = []
+            order_items_batch = []
+
+    # Tra ve batch cuoi neu con du lieu
+    if orders_batch:
+        yield orders_batch, order_items_batch
+
 
 
 #7. SINH PAYMENT
-def generate_payments(orders):
-    completed_orders = [
-        order for order in orders
-        if order["status"] == "completed"
-    ]
+def create_payment(order, payment_number):
+    """Tao Payment cho mot Order."""
 
-    paid_orders = random.sample(
-        completed_orders, COUNTS["Payment"]
-    )
+    return {
+        "payment_id": make_id("PAY", payment_number),
+        "order_id": order["order_id"],
+        "payment_date": order["order_date"],
+        "amount": order["total_amount"],
+        "payment_method": random.choice([
+            "Tien mat",
+            "The tin dung",
+            "Chuyen khoan",
+        ]),
+    }
 
-    payments = []
 
-    for i, order in enumerate(paid_orders, start=1):
-        payments.append({
-            "payment_id": make_id("PAY", i),
-            "order_id": order["order_id"],
-            "payment_date": order["order_date"],
-            "amount": order["total_amount"],
-            "payment_method": random.choice([
-                "Tien mat",
-                "The tin dung",
-                "Chuyen khoan",
-            ]),
-        })
+def validate_batch(orders, order_items, payments,
+                   store_ids, product_ids):
 
-    return payments
-
-#8. KIEM TRA VA XUAT DU LIEU
-def validate_data(tables):
     errors = []
 
-    # Kiem tra tong so ban ghi
-    total_rows = sum(len(rows) for rows in tables.values())
-
-    if total_rows != 10000:
-        errors.append(
-            f"Tong ban ghi la {total_rows}, khong phai 10000"
-        )
-
-    # Ten khoa chinh cua tung thuc the
-    pk_fields = {
-        "Category": "category_id",
-        "Store": "store_id",
-        "Customer": "customer_id",
-        "Product": "product_id",
-        "Order": "order_id",
-        "OrderItem": "order_item_id",
-        "Payment": "payment_id",
+    # Tao tap hop ID cua Order trong batch
+    batch_order_ids = {
+        order["order_id"] for order in orders
     }
 
-    # Kiem tra khoa chinh va gia tri rong
-    for table_name, rows in tables.items():
-        key = pk_fields[table_name]
-        values = [row[key] for row in rows]
+    # Tinh tong tien Order tu cac OrderItem
+    totals = {}
 
-        if len(values) != len(set(values)):
-            errors.append(f"{table_name}: khoa chinh bi trung")
-
-        for row_number, row in enumerate(rows, start=1):
-            for field, value in row.items():
-                if value is None or value == "":
-                    errors.append(
-                        f"{table_name}, dong {row_number}: "
-                        f"{field} bi rong"
-                    )
-
-    # Kiem tra email duy nhat
-    emails = [
-        row["email"] for row in tables["Customer"]
-        if row["email"]
-    ]
-
-    if len(emails) != len(set(emails)):
-        errors.append("Customer: email bi trung")
-
-    # Tap hop khoa de kiem tra foreign key
-    category_ids = {
-        row["category_id"] for row in tables["Category"]
-    }
-    store_ids = {
-        row["store_id"] for row in tables["Store"]
-    }
-    customer_ids = {
-        row["customer_id"] for row in tables["Customer"]
-    }
-    product_ids = {
-        row["product_id"] for row in tables["Product"]
-    }
-    order_ids = {
-        row["order_id"] for row in tables["Order"]
-    }
-
-    # Product -> Category
-    for product in tables["Product"]:
-        if product["category_id"] not in category_ids:
-            errors.append("Product: category_id khong ton tai")
-        if product["price"] < 0:
-            errors.append("Product: price am")
-
-    # Order -> Customer, Store
-    for order in tables["Order"]:
-        if order["customer_id"] not in customer_ids:
-            errors.append("Order: customer_id khong ton tai")
-        if order["store_id"] not in store_ids:
-            errors.append("Order: store_id khong ton tai")
-        if order["status"] not in {
-            "pending", "completed", "canceled"
-        }:
-            errors.append("Order: status khong hop le")
-        if order["total_amount"] < 0:
-            errors.append("Order: total_amount am")
-
-    # OrderItem -> Order, Product
-    for item in tables["OrderItem"]:
-        if item["order_id"] not in order_ids:
+    for item in order_items:
+        if item["order_id"] not in batch_order_ids:
             errors.append("OrderItem: order_id khong ton tai")
+
         if item["product_id"] not in product_ids:
             errors.append("OrderItem: product_id khong ton tai")
+
         if item["quantity"] <= 0:
             errors.append("OrderItem: quantity phai > 0")
+
         if item["uniprice"] < 0:
             errors.append("OrderItem: uniprice am")
 
-    # Payment -> Order
-    for payment in tables["Payment"]:
-        if payment["order_id"] not in order_ids:
-            errors.append("Payment: order_id khong ton tai")
-        if payment["amount"] < 0:
-            errors.append("Payment: amount am")
-
-    # Tong Order = tong quantity * uniprice
-    totals = {}
-
-    for item in tables["OrderItem"]:
         order_id = item["order_id"]
         line_total = item["uniprice"] * item["quantity"]
 
@@ -378,72 +385,194 @@ def validate_data(tables):
             order_id, Decimal("0.00")
         ) + line_total
 
-    for order in tables["Order"]:
-        calculated = money(
-            totals.get(order["order_id"], Decimal("0.00"))
+    # Kiem tra Order
+    orders_by_id = {
+        order["order_id"]: order
+        for order in orders
+    }
+
+    for order in orders:
+        customer_id_number = int(
+        order["customer_id"].replace("CUST", "")
+    )
+
+    if not (1 <= customer_id_number <= COUNTS["Customer"]):
+        errors.append("Order: customer_id khong ton tai")
+
+    if order["store_id"] not in store_ids:
+        errors.append("Order: store_id khong ton tai")
+
+    if order["status"] not in {
+        "pending", "completed", "canceled"
+    }:
+        errors.append("Order: status khong hop le")
+
+    calculated = money(
+        totals.get(order["order_id"], Decimal("0.00"))
+    )
+
+    if calculated != order["total_amount"]:
+        errors.append(
+            f"Order {order['order_id']}: total_amount sai"
         )
 
-        if calculated != order["total_amount"]:
-            errors.append(
-                f"Order {order['order_id']}: total_amount sai"
-            )
+    # Kiem tra Payment
+    for payment in payments:
+        order = orders_by_id.get(payment["order_id"])
 
-    # Payment trong bo du lieu nay phai thuoc order completed
-    for payment in tables["Payment"]:
-        order = next(
-            (
-                row for row in tables["Order"]
-                if row["order_id"] == payment["order_id"]
-            ),
-            None,
-        )
+        if order is None:
+            errors.append("Payment: order_id khong ton tai")
 
-        if order is not None and order["status"] != "completed":
+        elif order["status"] != "completed":
             errors.append(
                 f"Payment {payment['payment_id']}: "
                 "Order chua completed"
             )
 
     if errors:
-        print("\nDU LIEU CO LOI:")
         for error in errors[:20]:
             print("-", error)
 
-        print("Tong so loi:", len(errors))
-        raise ValueError("Khong xuat file vi du lieu chua hop le.")
+        raise ValueError("Batch co du lieu khong hop le.")
 
-    print("Kiem tra du lieu: DAT")
 
 #9. XUAT DU LIEU
 if __name__ == "__main__":
+
+    # 1. Sinh cac bang danh muc
     categories = generate_categories()
     stores = generate_stores()
-    customers = generate_customers()
     products = generate_products(categories)
 
-    orders, order_items = generate_orders(
-        customers, stores, products
-    )
-
-    payments = generate_payments(orders)
-
-    all_tables = {
-        "Category": categories,
-        "Store": stores,
-        "Customer": customers,
-        "Product": products,
-        "Order": orders,
-        "OrderItem": order_items,
-        "Payment": payments,
+    # 2. Tao tap hop ID de kiem tra FK
+    store_ids = {
+        row["store_id"] for row in stores
+    }
+    product_ids = {
+        row["product_id"] for row in products
     }
 
-    validate_data(all_tables)
+    # 3. Khoi tao file cho cac bang danh muc
+    exports = {}
 
-    for table_name, rows in all_tables.items():
-        export_csv_json(table_name, rows)
+    master_tables = {
+        "Category": categories,
+        "Store": stores,
+        "Product": products,
+    }
+
+    for table_name, rows in master_tables.items():
+        exports[table_name] = initialize_export(
+            table_name,
+            list(rows[0].keys())
+        )
+        append_export(exports[table_name], rows)
+
+    # 4. Khoi tao file cho cac bang giao dich
+    exports["Order"] = initialize_export(
+        "Order",
+        [
+            "order_id", "customer_id", "store_id",
+            "order_date", "status", "total_amount"
+        ]
+    )
+
+    exports["OrderItem"] = initialize_export(
+        "OrderItem",
+        [
+            "order_item_id", "order_id", "product_id",
+            "quantity", "uniprice"
+        ]
+    )
+
+    exports["Payment"] = initialize_export(
+        "Payment",
+        [
+            "payment_id", "order_id", "payment_date",
+            "amount", "payment_method"
+        ]
+    )
+
+    exports["Customer"] = initialize_export(
+        "Customer",
+        ["customer_id", "name", "email", "phone_number"]
+    )
+
+    for customers_batch in generate_customers():
+        append_export(exports["Customer"], customers_batch)
+
+    # 5. Sinh va xu ly tung batch
+    payment_number = 0
+
+    for orders_batch, items_batch in generate_orders(
+        stores, products
+    ):
+
+        payments_batch = []
+
+        for order in orders_batch:
+            order_number = int(
+                order["order_id"].replace("ORD", "")
+            )
+
+            # Chi Order completed moi co Payment
+            if order_number <= COMPLETED_COUNT:
+
+                is_paid = (
+                    order_number * COUNTS["Payment"]
+                    // COMPLETED_COUNT
+                    >
+                    (order_number - 1) * COUNTS["Payment"]
+                    // COMPLETED_COUNT
+                )
+
+                if is_paid:
+                    payment_number += 1
+
+                    payments_batch.append(
+                        create_payment(order, payment_number)
+                    )
+
+        # 6. Kiem tra batch
+        validate_batch(
+            orders_batch,
+            items_batch,
+            payments_batch,
+            store_ids,
+            product_ids
+        )
+
+        # 7. Xuat batch vao cac file
+        append_export(exports["Order"], orders_batch)
+        append_export(exports["OrderItem"], items_batch)
+        append_export(exports["Payment"], payments_batch)
+
+        print(
+            f"Da xu ly {exports['Order']['count']:,} "
+            f"/ {ORDER_COUNT:,} Orders"
+        )
+
+    # 8. Hoan tat cac file
+    for export_info in exports.values():
+        finalize_export(export_info)
+
+    # 9. Kiem tra tong so ban ghi
+    actual_total = sum(
+        export_info["count"]
+        for export_info in exports.values()
+    )
+
+    expected_total = sum(COUNTS.values())
+
+    if actual_total != expected_total:
+        raise ValueError(
+            f"Tong ban ghi sai: {actual_total}, "
+            f"mong doi {expected_total}"
+        )
+
+    if payment_number != COUNTS["Payment"]:
+        raise ValueError("So luong Payment khong dung")
 
     print("\nHOAN TAT!")
-    print("Tong so ban ghi:", sum(
-        len(rows) for rows in all_tables.values()
-    ))
+    print("Tong so ban ghi:", actual_total)
     print("Thu muc ket qua:", OUTPUT_DIR.resolve())
