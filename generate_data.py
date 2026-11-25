@@ -39,7 +39,7 @@ DATA_SIZES = {
     }
 }
 
-SIZE = "5M"  # Có thể đổi thành "1M" hoặc "5M"
+SIZE = "100K"  # Có thể đổi thành "1M" hoặc "5M"
 OUTPUT_DIR = Path("output") / SIZE
 COUNTS = DATA_SIZES[SIZE]
 
@@ -62,7 +62,7 @@ def random_date(start_date, end_date):
     """Sinh ngay ngau nhien trong khoang cho truoc."""
     days = (end_date - start_date).days
     result = start_date + timedelta(days=random.randint(0, days))
-    return result.isoformat() + "T10:00:00Z"
+    return result.strftime("%Y-%m-%dT10:00:00Z")
 
 
 def money(value):
@@ -396,25 +396,25 @@ def validate_batch(orders, order_items, payments,
         order["customer_id"].replace("CUST", "")
     )
 
-    if not (1 <= customer_id_number <= COUNTS["Customer"]):
-        errors.append("Order: customer_id khong ton tai")
+        if not (1 <= customer_id_number <= COUNTS["Customer"]):
+            errors.append("Order: customer_id khong ton tai")
 
-    if order["store_id"] not in store_ids:
-        errors.append("Order: store_id khong ton tai")
+        if order["store_id"] not in store_ids:
+            errors.append("Order: store_id khong ton tai")
 
-    if order["status"] not in {
-        "pending", "completed", "canceled"
-    }:
-        errors.append("Order: status khong hop le")
+        if order["status"] not in {
+            "pending", "completed", "canceled"
+        }:
+            errors.append("Order: status khong hop le")
 
-    calculated = money(
-        totals.get(order["order_id"], Decimal("0.00"))
-    )
-
-    if calculated != order["total_amount"]:
-        errors.append(
-            f"Order {order['order_id']}: total_amount sai"
+        calculated = money(
+            totals.get(order["order_id"], Decimal("0.00"))
         )
+
+        if calculated != order["total_amount"]:
+            errors.append(
+                f"Order {order['order_id']}: total_amount sai"
+            )
 
     # Kiem tra Payment
     for payment in payments:
